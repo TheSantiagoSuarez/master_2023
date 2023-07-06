@@ -1,24 +1,26 @@
-# Import essential libraries
-import requests
-import cv2
-import numpy as np
-import imutils
 import datetime
 from ultralytics import YOLO
+import cv2
 from helper import create_video_writer
+
+# streamlit imports
 import streamlit as st
 from PIL import Image
 import numpy as np
 import cv2
+
+# time import
 import time
+
+# text to speech imports
 from gtts import gTTS
 from io import BytesIO
+
+# youtube imports
 from pytube import YouTube
 import youtube_dl
 import tempfile
 
-# Replace the below URL with your own. Make sure to add "/shot.jpg" at last.
-url = "http://192.168.151.171:8080/shot.jpg"
 
 # define some constants
 CONFIDENCE_THRESHOLD = 0.8
@@ -87,34 +89,36 @@ while True:
     # start time to compute the fps
     start = datetime.datetime.now()
 
-    # Fetch image from the URL
-    img_resp = requests.get(url)
-    img_arr = np.array(bytearray(img_resp.content), dtype=np.uint8)
-    img = cv2.imdecode(img_arr, -1)
-    img = imutils.resize(img, width=1000, height=1800)
+    ret, frame = video_cap.read()
 
-    # run the YOLO model on the image
-    detections = model(img)[0]
+    # if there are no more frames to process, break out of the loop
+    if not ret:
+        break
+
+    # run the YOLO model on the frame
+    detections = model(frame)[0]
 
     # loop over the detections
     for data in detections.boxes.data.tolist():
         # extract the confidence (i.e., probability) associated with the detection
         confidence = data[4]
 
-        # filter out weak detections by ensuring the confidence is greater than the minimum confidence
+        # filter out weak detections by ensuring the
+        # confidence is greater than the minimum confidence
         if float(confidence) < CONFIDENCE_THRESHOLD:
             continue
 
-        # if the confidence is greater than the minimum confidence, draw the bounding box on the image
+        # if the confidence is greater than the minimum confidence,
+        # draw the bounding box on the frame
         xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
 
         # use different colours for different classes
         if detections.names[0] == "person":
-            cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
+            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
         elif detections.names[0] == "car":
-            cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
         else:
-            cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
+            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
 
     # end time to compute the fps
     end = datetime.datetime.now()
@@ -122,9 +126,9 @@ while True:
     total = (end - start).total_seconds()
     print(f"Time to process 1 frame: {total * 1000:.0f} milliseconds")
 
-    # calculate the frame per second and draw it on the image
+    # calculate the frame per second and draw it on the frame
     fps = f"FPS: {1 / total:.2f}"
-    cv2.putText(img, fps, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 8)
+    cv2.putText(frame, fps, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 8)
 
     if len(detections.names) > 0:
         # Loop through all detected objects
@@ -141,7 +145,7 @@ while True:
 
             # Put the name of the detected object on the bounding box
             cv2.putText(
-                img,
+                frame,
                 class_name,
                 (int(xmin), int(ymin) - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
@@ -150,10 +154,9 @@ while True:
                 8,
             )
 
-    # show the image in streamlit
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    frame_placeholder.image(img, channels="RGB")
-    
+    # show the frame to streamlit
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_placeholder.image(frame, channels="RGB")
     if st.session_state["button_pressed"]:
         # Reset the button_pressed state
         st.session_state["button_pressed"] = False
@@ -179,8 +182,7 @@ while True:
 
         time.sleep(10)
 
-    writer.write(img)
-
+    writer.write(frame)
     if cv2.waitKey(1) == ord("q"):
         break
 
